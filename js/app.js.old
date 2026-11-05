@@ -1,0 +1,473 @@
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.6/+esm";
+
+const supabase = createClient(
+    "https://rdkimdzkeojokgszkiih.supabase.co",
+    "sb_publishable_T-Y72XdxyHIg8Io5fhUpLg_q1SCjTLE"
+);
+
+const ORD_ANTIGUAS = 0,
+      ORD_NUEVAS = 1,
+      ORD_TITULO = 2;
+
+const ORDER = [
+    {
+        texto_div: "Primero las mas antiguas",
+        codigo: `'id', { ascending: false }`,
+    },
+    { texto_div: "Primero las mas recientes", codigo: `'id'` },
+    { texto_div: "Alfabéticamente por el título", codigo: `'titulo'` },
+];
+
+const RECETAS_POR_PAGINA = 12,
+      LIMITE_RECETAS = 100
+
+
+const PAGINA_SIGUIENTE = 1, 
+      PAGINA_ANTERIOR = -1,
+      MISMA_PAGINA = 0
+
+const idListaRecetas = 0,
+      tituloListaRecetas = 1
+
+
+window.addEventListener('load', (e) => {createTable()})
+
+const modalReceta = document.getElementById("modal-receta");
+const formReceta = document.getElementById("form-receta");
+const closeModalReceta = document.getElementById("closeRegisterModal");
+const buttonCloseModalReceta = document.getElementById("botonSalirReceta");
+const textAreaReceta = document.getElementById("textAreaReceta");
+const buttonSaveModalReceta = document.getElementById("botonGuardarReceta");
+
+const buttonCambioFiltroOrden = document.getElementById("btCambioFiltroOrden");
+const modalCambioFiltroOrden = document.getElementById("modalFiltroOrden");
+const buttonSalirModalFiltroOrden = document.getElementById(
+    "botonSalirModalFiltroOrden"
+);
+const buttonAplicarFiltroOrden = document.getElementById(
+    "botonAplicarFiltroOrden"
+);
+const iconCloseModelFiltroOrden = document.getElementById(
+    "closeModalFiltroOrden"
+);
+const buttonBorrarFiltros = document.getElementById("botonBorrarFiltros");
+
+
+const dbSelect = async (filtro, ordenRecetas, filtroPagina = MISMA_PAGINA) => {
+    let query = supabase.from("Recetas").select("id, titulo");
+
+    if (filtro.length > 0) {
+        let orText1 = `${campoToDb(filtro[0].campo)}.ilike.%${filtro[0].palabra}%`
+        if (filtro.length > 1) { 
+            let orText2 = `${campoToDb(filtro[2].campo)}.ilike.%${filtro[2].palabra}%`
+            if (filtro[1] == "o") {
+                let orQuery = orText1 + ", " + orText2
+                query = query.or(orQuery)
+            } else {
+                query = query.ilike(campoToDb(filtro[0].campo), '%' + filtro[0].palabra + '%')
+                query = query.ilike(campoToDb(filtro[2].campo), '%' + filtro[2].palabra + '%')     
+            }
+        } else {
+            // query = query.ilike(`${campoToDb(filtro[0].campo)}`, `'%${filtro[0].palabra}%'`)
+            query = query.ilike(campoToDb(filtro[0].campo), '%' + filtro[0].palabra + '%')
+        }
+    } 
+    
+    switch (ordenRecetas) {    
+        case 0: 
+            query = query.order('id', { ascending: false }) 
+            break
+        case 1: 
+            query = query.order('id')   
+            break  
+        case 2: 
+            query = query.order('titulo')   
+            break
+    }
+
+    query = query.limit(LIMITE_RECETAS);
+
+    try {
+        const { data, error } = await query;
+        return data;
+    } catch {
+        return error;
+    }
+};
+
+
+const dbSelectCount = async (filtro=filtro, filtroPagina = MISMA_PAGINA) => {
+    let query = supabase.from("Recetas").select("*", { count: "exact", head: true });
+
+    if (filtro.length > 0) {
+        let orText1 = `${campoToDb(filtro[0].campo)}.ilike.%${filtro[0].palabra}%`
+        if (filtro.length > 1) { 
+            let orText2 = `${campoToDb(filtro[2].campo)}.ilike.%${filtro[2].palabra}%`
+            if (filtro[1] == "o") {
+                let orQuery = orText1 + ", " + orText2
+                query = query.or(orQuery)
+            } else {
+                query = query.ilike(campoToDb(filtro[0].campo), '%' + filtro[0].palabra + '%')
+                query = query.ilike(campoToDb(filtro[2].campo), '%' + filtro[2].palabra + '%')   
+            }
+        } else {
+            query = query.ilike(campoToDb(filtro[0].campo), '%' + filtro[0].palabra + '%')
+        }
+    } 
+
+    try {
+        const { count, error } = await query;
+        return count;
+    } catch {
+        return error;
+    }
+};
+
+
+const dbSelectReceta = async (idReceta) => {
+    try {
+        const { data, error } = await supabase
+            .from("Recetas")
+            .select("id, titulo, receta, credito")
+            .eq("id", idReceta);
+        return data;
+    } catch {
+        return error;
+    }
+};
+
+
+const dbUpdate = async (recetaDict) => {
+    try {
+        const { error } = await supabase
+            .from('Recetas')
+            .update({ titulo:recetaDict.titulo, credito: recetaDict.credito, receta: recetaDict.receta })
+            .eq('id', recetaDict.id)
+        return true
+    } catch {
+        return error
+    }
+}
+
+
+var filtro = []
+var filtroTxt = "";
+var ordenRecetas = ORD_NUEVAS;
+
+var pagina = 1
+
+var listaRecetas = []
+var numRecetas 
+var isMasLimiteRecetas = true
+var recetaActual = { "id":NaN, "titulo":NaN, "credito":NaN, "receta":NaN }
+
+var bl_filtro = document.getElementById("filtro_texto");
+var bl_orden = document.getElementById("orden_texto");
+var bl_recetas = document.getElementById("table_recetas");
+
+
+async function createTable(cambioPagina=MISMA_PAGINA) {
+    if (pagina > listaRecetas.length) {
+        // numRecetas = await dbSelectCount(filtro, cambioPagina)
+        // if (numRecetas == 0) {
+        //     alert('No hay recetas para los filtros especificados')
+        //     openFiltroOrden()
+        //     return
+        // } else if (numRecetas > LIMITE_RECETAS && filtro.length != 0) {
+        //     alert(`Con los filtros actuales hay más de ${LIMITE_RECETAS} recetas.\nSe mostrarán las ${LIMITE_RECETAS} primeras`)
+        // }
+        const datosCrudos = await dbSelect(filtro, ordenRecetas, cambioPagina);
+        for (let item = 0; item < datosCrudos.length; item++) {
+            listaRecetas.push([datosCrudos[item]["id"], datosCrudos[item]["titulo"]])
+        }
+    }
+
+    numRecetas = listaRecetas.length
+        
+    bl_recetas.innerHTML = ""
+    if (pagina > 1){
+        bl_recetas.innerHTML += `<tr>
+                                    <td class="has-text-centered" data-id="PAGINA_ANTERIOR">
+                                    <span class="icon has-text-link"><i class="fas fa-angle-double-up"></i></span>
+                                    <span class="has-text-link" mr-5 ml-5>Recetas anteriores<span>
+                                    <span class="icon"><i class="fas fa-angle-double-up"></i></span></td>
+                                </tr>`;    
+    }
+    let indComienzo = RECETAS_POR_PAGINA * (pagina - 1)
+    let indFinal = Math.min((RECETAS_POR_PAGINA * pagina), numRecetas)
+    for (let item = indComienzo; item < indFinal; item++) {
+        bl_recetas.innerHTML += `<tr>
+                            <td data-id=${listaRecetas[item][idListaRecetas]}>
+                            ${listaRecetas[item][tituloListaRecetas]}</td>
+                            </tr>`;
+    }
+    
+    if (numRecetas > indFinal) {
+        bl_recetas.innerHTML += `<tr>
+                                    <td class="has-text-centered" data-id="PAGINA_SIGUIENTE">
+                                    <span class="icon has-text-link"><i class="fas fa-angle-double-down"></i></span>
+                                    <span class="has-text-link" mr-5 ml-5>Siguientes recetas<span>
+                                    <span class="icon"><i class="fas fa-angle-double-down"></i></span></td>
+                                </tr>`;
+    }
+
+    if (filtro.length == 0) {
+        filtroTxt = `Ninguno <span class="has-text-link"> ${"&nbsp;".repeat(4)}(se muestran las ${LIMITE_RECETAS} primeras recetas)</span> `;
+    } else {
+        filtroTxt =
+            '"' +
+            filtro[0].palabra +
+            '" en ' +
+            `<span class="has-text-danger">${filtro[0].campo}</span>`;
+        if (filtro.length > 1) {
+            filtroTxt =
+                filtroTxt +
+                `<span class="mr-5 ml-5">( ${filtro[1].toUpperCase()} )</span>`;
+            filtroTxt +=
+                '"' +
+                filtro[2].palabra +
+                '" en ' +
+                `<span class="has-text-danger">${filtro[2].campo}</span>`;
+        }
+        if (isMasLimiteRecetas == true) {
+            filtroTxt += `<span class="has-text-link"> ${"&nbsp;".repeat(4)}(se muestran las ${LIMITE_RECETAS} primeras recetas)</span> `;    
+        }
+    }
+
+    bl_filtro.innerHTML = filtroTxt;
+    bl_orden.innerText = ORDER[ordenRecetas].texto_div;
+}
+
+
+document.getElementById("table_recetas").addEventListener("click", function (e) {
+    const receta = e.target.closest("tr");
+    if (receta) {
+        if (receta.cells[0].dataset.id == "PAGINA_ANTERIOR") {
+            pagina -= 1
+            createTable()
+        } else if (receta.cells[0].dataset.id == "PAGINA_SIGUIENTE") {
+            pagina += 1
+            createTable()
+        } else {
+            recetaActual.id = receta.cells[0].dataset.id
+            openMainReceta(recetaActual.id)
+        }
+    }
+});
+
+
+closeModalReceta.addEventListener("click", function () {
+    modalReceta.classList.remove("is-active");
+});
+buttonCloseModalReceta.addEventListener("click", function () {
+    modalReceta.classList.remove("is-active");
+});
+formReceta.addEventListener("input", function () {
+    buttonSaveModalReceta.style.display = "block";
+});
+buttonSaveModalReceta.addEventListener("click", async () => {
+    let refrescarTabla = (recetaActual.titulo !== formReceta["titulo"].value)
+    if ((recetaActual.titulo !== formReceta["titulo"].value) || 
+            (recetaActual.credito !== formReceta["credito"].value) ||
+            (recetaActual.receta !== formReceta["pasos"].value)) {
+        // alert('Se va a guardar la receta')
+        recetaActual.titulo = formReceta["titulo"].value
+        recetaActual.credito = formReceta["credito"].value
+        recetaActual.receta = formReceta["pasos"].value
+        const updateTrue = await dbUpdate(recetaActual)
+        if (updateTrue === true) {
+            alertNew({alertText: "La receta se ha actualizado"})
+        } else {
+            alertNew({alertText: 'FALLO en el update', alertType: "error"})
+        }
+    } else {
+        alertNew({alertText: 'No se va a guardar la receta porque no ha cambiado el contenido', alertType: "error"})
+    } 
+    if (refrescarTabla === true) {
+        listaRecetas = []
+        createTable()     
+    }
+    modalReceta.classList.remove("is-active");
+})
+
+
+const openMainReceta = async (idReceta) => {
+    let dataReceta = await dbSelectReceta(idReceta);
+    buttonSaveModalReceta.style.display = "none";
+
+    recetaActual.titulo = dataReceta[0]["titulo"]
+    recetaActual.credito = (dataReceta[0]["credito"] === null) ? "" : dataReceta[0]["credito"] 
+    recetaActual.receta = dataReceta[0]["receta"]
+
+    formReceta["titulo"].value = dataReceta[0]["titulo"]
+    formReceta["credito"].value = dataReceta[0]["credito"];
+    formReceta["pasos"].value = dataReceta[0]["receta"];
+    textAreaReceta.scrollTop = 0;
+
+    modalReceta.classList.add("is-active");
+};
+
+
+function openFiltroOrden() {
+    const ordenTxt = ordenRecetas.toString();
+    document.querySelector(
+        `[name="orden"][value='${ordenTxt}']`
+    ).checked = true;
+    modalCambioFiltroOrden.classList.add("is-active");
+
+    if (filtro.length > 0) {
+        document.getElementById("inputFiltro1").value = filtro[0].palabra;
+        document.getElementById("selectCampo1").value = filtro[0].campo;
+        if (filtro.length == 3) {
+            document.querySelector(
+                `[name="yo1"][value=${filtro[1]}]`
+            ).checked = true;
+            document.getElementById("inputFiltro2").value = filtro[2].palabra;
+            document.getElementById("selectCampo2").value = filtro[2].campo;
+        }
+    }
+}
+
+async function aplicarFiltroOrden() {
+    var opcOrden, opcFiltro;
+    const oldOpcOrden = ordenRecetas,
+        oldOpcFiltro = filtro;
+
+    let radioBtOrdenActivo = document.querySelector(
+        'input[name="orden"]:checked'
+    );
+    if (radioBtOrdenActivo) {
+        opcOrden = parseInt(radioBtOrdenActivo.value);
+    } else {
+        opcOrden = oldOpcOrden;
+    }
+    let isOrdenChanged = opcOrden !== oldOpcOrden;
+
+    let campo2 = "";
+    let yoActivoValue = "";
+    let palabra1 = document.getElementById("inputFiltro1").value;
+    let campo1 = document.getElementById("selectCampo1").value;
+    let palabra2 = document.getElementById("inputFiltro2").value;
+    if (palabra2 !== "") {
+        campo2 = document.getElementById("selectCampo2").value;
+        yoActivoValue = document.querySelector('input[name="yo1"]:checked');
+        if (!yoActivoValue) {
+            document.querySelector(
+                'input[name="yo1"][value="y"]'
+            ).checked = true;
+            yoActivoValue = "y";
+        } else {
+            yoActivoValue = document.querySelector(
+                'input[name="yo1"]:checked'
+            ).value;
+        }
+    }
+    let newFiltro = [];
+    if (palabra1 !== "") {
+        newFiltro.push({ palabra: `${palabra1}`, campo: `${campo1}` });
+        if (palabra2 !== "" && yoActivoValue !== "") {
+            newFiltro.push(yoActivoValue);
+            newFiltro.push({ palabra: `${palabra2}`, campo: `${campo2}` });
+        }
+    }
+
+    let isFiltroChanged = !areFiltrosIguales(filtro, newFiltro)
+
+    if (isFiltroChanged == true) {
+        let numRecetasNow = await dbSelectCount(newFiltro, MISMA_PAGINA)
+        if (numRecetasNow == 0) {
+            alert('No hay recetas para los filtros especificados')
+            openFiltroOrden()
+            return
+        } else if (numRecetasNow > LIMITE_RECETAS && newFiltro.length != 0) {
+            alert(`Con los filtros actuales hay más de ${LIMITE_RECETAS} recetas.\nSe mostrarán las ${LIMITE_RECETAS} primeras`)
+        }
+        numRecetas = numRecetasNow
+        isMasLimiteRecetas = (numRecetas > LIMITE_RECETAS)
+    }
+
+    if (isFiltroChanged == true || isOrdenChanged == true) {
+        ordenRecetas = opcOrden
+        filtro = []
+        filtro = JSON.parse(JSON.stringify(newFiltro))
+        pagina = 1
+        listaRecetas = []
+        createTable()
+    }
+    modalCambioFiltroOrden.classList.remove("is-active")
+}
+
+function borrarFiltros() {
+    document.getElementById("inputFiltro1").value = "";
+    document.getElementById("selectCampo1").value = "Título";
+    document.querySelector(`[name="yo1"][value="y"`).checked = false;
+    document.querySelector(`[name="yo1"][value="o"`).checked = false;
+    document.getElementById("inputFiltro2").value = "";
+    document.getElementById("selectCampo2").value = "Título";
+}
+
+function campoToDb(campoTxt) {
+    var campoDb
+        switch (campoTxt) {
+            case 'Título':
+                campoDb = 'titulo'
+                break;  
+            case 'Cocinero/a':
+                campoDb = "credito"
+                break
+            case 'Receta':
+                campoDb = 'receta'
+                break
+        }
+    return campoDb
+}
+
+function areFiltrosIguales(filtro1, filtro2) {
+    let sonIguales = (JSON.stringify(filtro1) === JSON.stringify(filtro2))
+    return sonIguales
+}
+
+
+buttonCambioFiltroOrden.addEventListener("click", openFiltroOrden);
+buttonSalirModalFiltroOrden.addEventListener("click", function () {
+    modalCambioFiltroOrden.classList.remove("is-active");
+});
+buttonAplicarFiltroOrden.addEventListener("click", aplicarFiltroOrden);
+iconCloseModelFiltroOrden.addEventListener("click", function () {
+    modalCambioFiltroOrden.classList.remove("is-active");
+});
+buttonBorrarFiltros.addEventListener("click", borrarFiltros);
+
+
+const alertNew = ({alertTitulo="Atención", alertText="", alertBoton="Ok", alertType="success"}) => { new RabbitModal({
+    title: alertTitulo,
+    content: alertText,
+    size: "default",
+    position: "center",
+    type: alertType,
+    buttons: [
+        {
+            key: "close",
+            text: alertBoton,
+            type: "secondary"
+        }
+    ],
+    timer: {
+        enabled: true,
+        duration: 5000,
+        progress: true,
+        closeOnTimeup: true,
+        onTick: (remainingSeconds, modal) => {
+
+        },
+        onTimeup: async (modal) => {
+            // Do something when timer ends
+            // console.log('onTimeup')
+            // console.log(modal)
+        }
+    }
+    }).show()
+};
+
+
+

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="./css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.css">
+    <link rel="stylesheet" href="./css/rabbit-modal.css">
+    <title>Recetario</title>
+</head>
+<body>
+    <header>
+        <nav class="navbar" role="navigation" aria-label="main navigation">
+            <div class="navbar-brand">
+                <div class="navbar-item">
+                    <span class="icon-text">
+                        <span class="icon">
+                            <img src="./assets/recetario_icon.svg">
+                        </span>
+                        <span style="padding-left: 10px;">Recetario</span>
+                    </span>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div class="block principal" id="filtro">
+        <h1 class="title is-5">Filtro:</h1>
+        <div id="div_filtro_texto">
+          <p class="has-text-centered is-size-6 has-text-weight-semibold" id="filtro_texto"></p>
+        </div>
+    </div>
+    <div class="block principal" id="orden">
+        <h1 class="title is-5">Orden:</h1>
+        <div id="div_orden_texto">
+          <p class="has-text-centered is-size-6 has-text-weight-semibold" id="orden_texto"></p>
+        </div>
+    </div>
+    <div class="block principal" id="lista_recetas">
+        <h1 class="title is-5">Recetas seleccionadas:</h1>
+        <div id="recetas">
+          <table class="table is-narrow is-hoverable is-fullwidth">
+            <tbody id="table_recetas">
+            </tbody>
+          </table>
+        </div>
+    </div>
+    <div class="block principal" id="botonesPrincipal">
+      <div class="buttons">
+        <button class="button is-success" id="btCambioFiltroOrden">Cambiar filtro/orden</button>
+        <button class="button is-success" id="btNuevaReceta">Nueva receta</button>
+      </div>
+    </div>
+
+
+    <div class="modal" id="modal-receta">
+      <div class="modal-background"></div>
+      <div class="modal-card">
+        <header class="modal-card-head">
+          <p class="modal-card-title" id="tituloModal">Receta seleccionada</p>
+          <button class="delete" aria-label="close" id="closeRegisterModal"></button>
+        </header>
+    
+        <section class="modal-card-body" id="modal-card-receta">
+          <form id="form-receta">
+            <div class="field">
+              <label class="label">Receta:</label>
+              <div class="control">
+                <input class="input cmpRecetaForm" type="text" name="titulo" placeholder="Título de la receta">
+              </div>
+            </div>
+    
+            <div class="field">
+              <label class="label">Crédito:</label>
+              <div class="control">
+                <input class="input cmpRecetaForm" type="text" name="credito" placeholder="Cocinero/a o autor">
+              </div>
+            </div>
+    
+            <div class="field">
+              <textarea id="textAreaReceta" class="textarea" name="pasos" placeholder="Ingredientes y pasos de la receta"
+                rows="16">
+              </textarea>
+            </div>
+          </form>
+        </section>
+    
+        <form class="modal-card-foot">
+          <div class="block" id="botonesReceta">
+            <div class="buttons">
+              <button type="button" class="button is-success" id="botonSalirReceta"> 
+                <span>Salir</span>
+              </button>
+              <button type="button" class="button is-success" id="botonGuardarReceta">
+                <span>Guardar</span>
+              </button>
+              <button type="button" class="button is-danger" id="botonBorrarReceta" style="margin-left: 30px;">
+                <span>Eliminar</span>
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+
+    <div class="modal" id="modalFiltroOrden">
+      <div class="modal-background"></div>
+      <div class="modal-card">
+        <header class="modal-card-head">
+          <p class="modal-card-title" id="tituloModal">Ordenación y filtros</p>
+          <button class="delete" aria-label="close" id="closeModalFiltroOrden"></button>
+        </header>
+
+        <section class="modal-card-body">
+          <div class="modal-content">
+            <div class="box">
+              <h1 class="title is-5">Ordenación:</h1>
+              <form id="cambioOrden">        
+                  <div class="control">
+                    <label class="radio">
+                      <input type="radio" name="orden" value=0>
+                      Primero las mas antiguas
+                    </label>
+                    <br>
+                    <label class="radio">
+                      <input type="radio" name="orden" value=1>
+                      Primero las mas nuevas
+                    </label>
+                    <br>
+                    <label class="radio">
+                      <input type="radio" name="orden" value=2>
+                      Por el título
+                    </label>
+                  </div>          
+              </form>
+            </div>
+            <div class="box">
+              <h1 class="title is-5">Filtros:</h1>
+              <form id="cambioFiltro">
+                <input class="input" id="inputFiltro1" type="text" style="width: 250px; font-size: 11pt; margin-right: 10px;" placeholder="Palabra(s) a buscar"/>
+                en
+                <div class="select is-normal">
+                  <select id="selectCampo1" style="font-size: 11pt; margin-left: 10px;">
+                    <option>Título</option>
+                    <option>Receta completa</option>
+                    <option>Cocinero/a</option>
+                  </select>
+                </div>
+                <div class="control">
+                  <label class="radio">
+                    <input type="radio" name="yo1" value="y">
+                    y 
+                  </label>
+                  <label class="radio">
+                    <input type="radio" name="yo1" value="o">
+                    o 
+                  </label>
+                </div>
+                <input class="input" id="inputFiltro2" type="text" style="width: 250px; font-size: 11pt; margin-right: 10px;" placeholder="Palabra(s) a buscar"/>
+                en
+                <div class="select is-normal">
+                  <select id="selectCampo2" style="font-size: 11pt; margin-left: 10px;">
+                    <option>Título</option>
+                    <option>Receta completa</option>
+                    <option>Cocinero/a</option>
+                  </select>
+                </div>
+
+              </form>
+            </div>
+          </div>
+        </section>
+      
+        <form class="modal-card-foot">
+          <div class="block" id="botonesFiltroOrden">
+            <div class="buttons">
+              <button type="button" class="button is-success" id="botonSalirModalFiltroOrden">
+                <span>Salir</span>
+              </button>
+              <button type="button" class="button is-success" id="botonAplicarFiltroOrden">
+                <span>Aplicar</span>
+              </button>
+              <button type="button" class="button is-warning" id="botonBorrarFiltros">
+                <span>Borrar filtros</span>
+              </button>
+            </div>
+          </div>
+        </form>
+    </div>
+
+
+    <script type="module" src="./js/rabbit-modal.min.js"></script>
+    <script type="module" src="./js/app.js"></script>
+    
+
+</body>
+</html>
